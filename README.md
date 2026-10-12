@@ -244,10 +244,13 @@ container-seal-detection/
     ├── split_dataset.py     # 프레임 기준 분할 + 검증
     ├── train.py             # 학습 1회 + validation 재평가 + 실험 기록
     ├── evaluate.py          # val/test 평가 (test는 --final 필요, 한 번만 허용)
+    ├── predict.py           # 새 이미지 또는 이미지 폴더에 대한 inference
     └── common.py            # 경로, 실행 환경·데이터 hash 기록
 ```
 
-## 재현 방법
+## 재현 및 사용 방법
+
+### 데이터 준비 · 학습 · 평가
 
 1. Roboflow YOLO11 export ZIP을 `data/raw/robot-labeling.v2i.yolov11.zip`에 둡니다.
 2. 분할 스크립트를 실행합니다. Python 표준 라이브러리만 사용합니다.
@@ -289,6 +292,38 @@ container-seal-detection/
 
    - `--final` 없이는 test 평가를 거부합니다.
    - `outputs/test_evaluation.csv`가 이미 있으면 다시 평가하지 않습니다.
+
+### Inference
+
+[scripts/predict.py](scripts/predict.py)는 학습된 weight로 새 이미지에 예측을 실행하는 도구입니다. metric 평가나 모델 선택에는 쓰지 않습니다.
+
+```bash
+# 이미지 1장
+python scripts/predict.py \
+  --weights path/to/best.pt \
+  --source path/to/image.jpg
+
+# 이미지 폴더
+python scripts/predict.py \
+  --weights path/to/best.pt \
+  --source path/to/images \
+  --device cpu \
+  --name example_run
+```
+
+| 옵션 | 설명 |
+|---|---|
+| `--weights` | 사용할 YOLO weight |
+| `--source` | 이미지 1장 또는 이미지 폴더 |
+| `--imgsz` | 기본 640 |
+| `--conf` | 기본 0.25 |
+| `--device` | 미지정 시 자동 선택 |
+| `--name` | 출력 폴더 이름 |
+
+- 결과는 `outputs/predictions/<run_name>/`에 저장됩니다. box를 그린 예측 이미지와 검출 결과 `.txt`가 함께 저장됩니다. 원본 이미지는 수정하지 않습니다.
+- 모델 weight는 저장소에 포함하지 않습니다 (`.gitignore`에서 `*.pt` 제외). 직접 학습한 `best.pt`를 지정해야 합니다.
+- held-out test 데이터를 `--source`로 지정하면 코드에서 실행을 막습니다.
+- 동작은 1 epoch smoke weight와 validation 이미지 1장으로 확인했습니다. 예측 이미지와 결과 `.txt`가 저장되는 것까지 확인했습니다.
 
 ## 사용 도구
 
