@@ -2,8 +2,16 @@
 
 컨테이너 seal을 검출하는 1-class object detection 프로젝트입니다.
 
-> **현재 상태: 데이터 준비 및 분할 완료, 모델 학습 전 단계**
-> 아직 모델을 학습하지 않았으므로 성능 수치는 없습니다.
+> **현재 상태: 데이터 준비 → 학습 → held-out test 평가 완료**
+> 모든 데이터는 한 번의 촬영 세션에서 나왔습니다. 아래 수치는 이 데이터 범위 안에서의 결과입니다.
+
+## 요약
+
+- YOLO11n과 YOLO11s를 같은 조건에서 seed 3개씩 학습했습니다. 학습 전에 정한 기준(validation mAP50-95의 3-seed 평균)에 따라 **YOLO11n**을 선택했습니다.
+  - validation mAP50-95: YOLO11n 0.7273 ± 0.0426, YOLO11s 0.6758 ± 0.0297
+- 촬영 구도가 다른 원거리 장면으로 만든 held-out test에서는 **mAP50 0.540, mAP50-95 0.289, recall 0.500**이었습니다. validation보다 크게 낮습니다.
+- 주요 실패 패턴은 false negative입니다. 가깝거나 사람이 들고 있는 seal은 대부분 검출했지만, 원거리에서 작게 보이는 고정된 seal은 자주 놓쳤습니다.
+- 이 small-object failure를 본 뒤, 같은 weight로 추론 해상도만 1280으로 올린 **post-hoc 실험**에서 test recall이 0.500 → 0.981로 개선됐습니다. 이 설정은 test 결과를 보고 고른 것이라 공식 benchmark로 쓰지 않고, 공식 수치는 위의 imgsz 640 결과입니다.
 
 ## 데이터셋
 
@@ -15,7 +23,7 @@
 | 클래스 | 1개 (`container_seal`) |
 | bounding box | 118개 |
 
-데이터(이미지, 라벨, ZIP)는 저장소에 포함하지 않습니다.
+데이터(이미지, 라벨, ZIP)는 회사·업무 데이터라 저장소에 포함하지 않습니다. 같은 이유로 이 README에도 원본 이미지나 예측 결과 이미지는 넣지 않았습니다.
 
 ## 라벨링 과정
 
@@ -63,6 +71,152 @@
 | 77 | 카메라 구도 전환 중인 프레임 |
 | 78 | 이미 test와 같은 원거리 구도라, train에 넣으면 test 장면이 학습에 섞임 |
 
+## 학습 설정
+
+모든 run은 아래 조건으로 학습했습니다. 이 값은 [scripts/train.py](scripts/train.py)에 고정되어 있고, 명령행에서는 모델·seed·device만 바꿀 수 있습니다.
+
+| 항목 | 값 |
+|---|---|
+| 모델 | `yolo11n.pt`, `yolo11s.pt` (COCO pretrained) |
+| imgsz | 640 |
+| epochs | 100 |
+| batch | 8 |
+| patience (early stopping) | 30 |
+| seed | 0, 1, 2 |
+| deterministic | True |
+| workers | 2 |
+| augmentation, optimizer, learning rate | Ultralytics 기본값 (`optimizer=auto`) |
+| best.pt 선택 기준 | validation mAP50-95 (Ultralytics 8.4.175의 fitness) |
+
+실행 환경과 기록은 다음과 같습니다.
+
+| 항목 | 값 |
+|---|---|
+| 환경 | Google Colab, Tesla T4 (6개 run 모두 동일) |
+| 라이브러리 | Python 3.13.15, torch 2.11.0+cu130, ultralytics 8.4.175 |
+| 코드 버전 | git commit `13fca2e` |
+| 분할 식별값 | split_hash `6f8a98888a3b` |
+| 원본 ZIP SHA-256 | `f5385864da63b899c271fa996f48b48692ba0a90ffb2fb86ea7ef336fb101520` |
+
+- `split_hash`는 train/valid/test/excluded에 들어간 프레임 번호만으로 계산합니다. 그래서 OS와 관계없이, 같은 분할이면 같은 값이 나옵니다.
+- 처음 Colab에서 한 번 학습했을 때는 split_hash가 로컬과 다르게 나왔습니다. 확인해 보니 분할 내용은 같았고, 기록 파일의 줄바꿈 문자(Windows CRLF / Linux LF) 차이 때문이었습니다. 그래서 hash 계산 방식을 고친 뒤, 그 run은 기록에서 폐기하고 수정된 코드로 6개 run을 다시 학습했습니다.
+
+## 모델 선택 (validation)
+
+### 선택 규칙 (학습 전에 정함)
+
+1. YOLO11n과 YOLO11s를 같은 조건에서 각각 seed 0, 1, 2로 학습합니다.
+2. validation mAP50-95의 3-seed 평균과 표준편차로 비교합니다.
+3. 평균 차이가 seed 간 변동폭보다 작으면, 더 작은 YOLO11n을 선택합니다.
+4. test set은 모델을 최종 선택한 뒤에만 평가합니다.
+
+### 결과
+
+validation은 13장(bbox 12개)입니다. 평균 ± 표준편차는 3개 seed의 표본 표준편차입니다.
+
+| 모델 | seed | best epoch | Precision | Recall | mAP50 | mAP50-95 |
+|---|---|---|---|---|---|---|
+| YOLO11n | 0 | 74 | 1.0000 | 0.9089 | 0.9150 | 0.6783 |
+| YOLO11n | 1 | 94 | 0.9948 | 0.9167 | 0.9888 | 0.7561 |
+| YOLO11n | 2 | 37 | 1.0000 | 0.9091 | 0.9150 | 0.7474 |
+| **YOLO11n** | **평균 ± 표준편차** | | **0.9983 ± 0.0030** | **0.9116 ± 0.0044** | **0.9396 ± 0.0426** | **0.7273 ± 0.0426** |
+| YOLO11s | 0 | 69 | 1.0000 | 0.7442 | 0.8533 | 0.6452 |
+| YOLO11s | 1 | 99 | 0.9193 | 0.9503 | 0.9758 | 0.7044 |
+| YOLO11s | 2 | 79 | 0.9077 | 0.8202 | 0.8824 | 0.6778 |
+| **YOLO11s** | **평균 ± 표준편차** | | **0.9423 ± 0.0503** | **0.8382 ± 0.1042** | **0.9038 ± 0.0640** | **0.6758 ± 0.0297** |
+
+### 선택 과정
+
+- **모델**
+  - 주 기준인 validation mAP50-95의 3-seed 평균은 YOLO11n 0.7273, YOLO11s 0.6758이었습니다.
+  - 평균이 더 높고 seed 간 recall 변동도 더 작은 **YOLO11n**을 선택했습니다.
+  - 선택 규칙 3번에 해당하더라도 결론은 같습니다. 그 경우에도 더 작은 YOLO11n을 고르게 되어 있기 때문입니다.
+  - 다만 seed가 3개뿐이고 validation이 12개 box라, 이 차이가 통계적으로 확실하다고 보기는 어렵습니다.
+- **test용 weight**
+  - YOLO11n의 세 seed 중 validation mAP50-95가 가장 높은 **seed 1의 best.pt**(best epoch 94)를 최종 test 평가에 사용했습니다.
+  - 이 weight의 validation mAP50-95 **0.7561은 3개 중 가장 높은 단일 run 값이라 낙관적인 수치**입니다. YOLO11n의 validation 성능은 3-seed 평균인 0.7273 ± 0.0426으로 보는 것이 적절합니다.
+
+## Held-out test 결과
+
+이 섹션의 imgsz 640 결과가 이 프로젝트의 **공식 held-out benchmark**입니다.
+
+최종 모델을 validation만으로 정한 뒤, test를 **한 번만** 평가했습니다. test 결과를 보고 모델이나 hyperparameter를 바꾸지 않았고, 같은 test set으로 다른 모델을 다시 고르지도 않았습니다.
+
+| 항목 | 값 |
+|---|---|
+| 모델 | YOLO11n seed 1, best.pt |
+| test 데이터 | 27장, 54개 instance (원거리 장면, frame 79–106) |
+| Precision | 0.991 |
+| Recall | 0.500 |
+| mAP50 | 0.540 |
+| mAP50-95 | 0.289 |
+| 추론 속도 | 17.0 ms/image (Tesla T4) |
+
+- validation(mAP50-95 0.7273 ± 0.0426)보다 test(0.289)가 크게 낮습니다.
+- test는 처음부터 train/validation과 촬영 구도가 다른 장면으로 만들었습니다. 그래서 이 차이는 같은 장면 안의 성능과 새로운 장면에서의 성능 차이를 보여줍니다.
+- 추론 속도는 Tesla T4 한 종류에서 잰 값입니다. 다른 GPU에서 잰 값과는 직접 비교할 수 없습니다.
+
+## Failure analysis
+
+test 예측 결과를 직접 확인한 내용입니다. 예측 이미지는 회사·업무 데이터라 공개하지 않습니다.
+
+**관찰한 내용**
+- test 이미지에는 모두 container_seal이 2개씩 있습니다.
+- 가까이 있거나 사람이 들고 있는 seal은 대부분 검출했습니다.
+- 위쪽 구조물에 고정되어 있고 화면에서 작게 보이는 seal은 자주 놓쳤습니다.
+- precision은 0.991인데 recall은 0.500입니다. 잘못 잡은 box(false positive)보다는 놓친 객체(false negative)가 주요 실패 패턴입니다.
+
+**가능한 원인 (추정)**
+- 원거리 장면에서 seal이 작게 보입니다.
+- train 데이터는 근접 장면뿐이었습니다. 원거리 구도나 구조물에 고정된 seal은 학습 데이터에 없었습니다.
+- 이 두 가지가 원인일 가능성이 있습니다. 다만 원인별로 따로 검증한 실험은 하지 않았으므로 확정할 수는 없습니다.
+
+## Post-hoc high-resolution inference
+
+> 이 실험은 test 결과와 failure pattern을 **본 뒤에** 설정을 고른 것입니다. 그래서 unbiased held-out benchmark가 아니라 사후(post-hoc) 실험으로만 기록합니다.
+
+Failure analysis에서 "작게 보이는 seal을 놓친다"는 패턴을 확인했습니다. 그래서 작은 객체가 원인이라는 가설을 확인하려고, **모델 weight와 학습 설정은 그대로 두고** 같은 YOLO11n seed 1 best.pt로 **추론 해상도(imgsz)만 640에서 1280으로** 올려 test를 다시 평가했습니다. 모델은 imgsz 640으로 학습된 그대로입니다.
+
+| 추론 imgsz | Precision | Recall | mAP50 | mAP50-95 | 추론 속도 (Tesla T4) | 구분 |
+|---|---|---|---|---|---|---|
+| 640 | 0.991 | 0.500 | 0.540 | 0.289 | 17.0 ms/image | 공식 held-out benchmark |
+| 1280 | 0.998 | 0.981 | 0.992 | 0.593 | 23.8 ms/image | post-hoc 실험 |
+
+**해석**
+- recall이 0.500에서 0.981로 올랐고, precision은 0.99 수준을 유지했습니다. 640에서 놓치던 객체 대부분을 1280에서는 검출했다는 뜻입니다.
+- 작은 원거리 객체가 주요 실패 원인이라는 가설을 **뒷받침하는 결과**입니다. 다만 다음 이유로 가설이 증명됐다고 보지는 않습니다.
+  - 설정을 같은 test set의 결과를 보고 골랐으므로, 이 수치는 낙관적일 수 있습니다.
+  - test는 한 장면(27장)뿐입니다. 다른 원거리 장면에서도 같은 효과가 날지는 확인하지 않았습니다.
+
+**trade-off**
+- 추론 시간이 17.0에서 23.8 ms/image로 약 40% 늘었습니다. 둘 다 Tesla T4에서 잰 값입니다.
+- 해상도를 올리면 메모리 사용량도 늘어나므로, 실제로 쓸 장비에서 속도와 메모리를 따로 확인해야 합니다.
+
+**운영 원칙**
+- 이 결과를 보고 test로 추가 모델 선택이나 hyperparameter 조정은 하지 않았습니다.
+- 이 실험은 저장소 스크립트만으로는 재현되지 않습니다. [scripts/evaluate.py](scripts/evaluate.py)는 imgsz 640으로 고정되어 있고, test 평가를 한 번만 허용하기 때문입니다.
+
+## 한계
+
+- 모든 데이터가 한 번의 촬영 세션에서 나왔습니다. 다른 환경(조명, 컨테이너, 카메라)에서도 잘 동작할지는 이 데이터로 검증할 수 없습니다.
+- validation이 13장(bbox 12개)으로 작아서, 평가 지표가 크게 흔들릴 수 있습니다. 모델 비교에 쓴 seed도 3개뿐입니다.
+- test는 원거리 장면 하나뿐이라 장면 다양성이 부족합니다. test bbox 54개 중 27개는 장면에 고정된 같은 seal입니다.
+- 원거리 구도는 train 데이터에 없었습니다.
+- 최종 weight의 validation 수치(0.7561)는 seed 3개 중 최고값을 고른 영향으로 낙관적입니다.
+- imgsz 1280 결과는 test를 본 뒤 고른 post-hoc 설정이라 일반화 성능의 근거로 쓸 수 없습니다.
+
+## 향후 계획
+
+아래는 아직 하지 않은 작업이고, 효과도 검증되지 않았습니다.
+
+- 원거리 장면, 구조물에 고정된 seal 등 장면 다양성을 늘린 데이터를 추가로 촬영하고 라벨링하기
+- 고해상도 추론(imgsz 1280)의 효과를 새로 촬영한 데이터에서 확인하기 (지금은 post-hoc 결과만 있음)
+- 작은 객체 검출을 위한 다른 방법 검토하기 (예: 고해상도로 학습하기, 이미지를 타일로 나눠 추론하기)
+
+**평가 원칙**
+- 이번 test set은 이미 결과를 확인했으므로, 개선한 모델의 평가나 선택에 다시 쓰지 않습니다.
+- 개선 모델은 **새로 촬영한 별도 세션 데이터**를 test로 두고 평가합니다.
+
 ## 프로젝트 구조
 
 ```
@@ -73,8 +227,12 @@ container-seal-detection/
 │   ├── raw/                 # Roboflow export ZIP (Git 제외)
 │   └── processed/           # 분할된 데이터셋 (Git 제외)
 ├── outputs/                 # 학습·평가 결과 (Git 제외)
+├── requirements.txt         # ultralytics 버전 고정 (torch는 환경별 설치)
 └── scripts/
-    └── split_dataset.py     # 프레임 기준 분할 + 검증
+    ├── split_dataset.py     # 프레임 기준 분할 + 검증
+    ├── train.py             # 학습 1회 + validation 재평가 + 실험 기록
+    ├── evaluate.py          # val/test 평가 (test는 --final 필요, 한 번만 허용)
+    └── common.py            # 경로, 실행 환경·데이터 hash 기록
 ```
 
 ## 재현 방법
@@ -92,14 +250,36 @@ container-seal-detection/
      - 이미지와 라벨이 1:1로 대응하는지
      - YOLO 형식과 좌표 범위가 올바른지
    - 출력 폴더가 이미 있으면 덮어쓰지 않습니다. `--overwrite`를 붙이면 이 스크립트가 만든 출력만 교체합니다.
+   - 원본 ZIP의 SHA-256을 출력하고 기록합니다. 위 학습 설정 표의 값과 같은지 확인하세요.
+3. 의존성을 설치합니다. torch는 환경에 맞게 먼저 설치합니다 (Colab은 기본 설치된 CUDA torch 사용).
 
-## 한계
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- 모든 데이터가 한 번의 촬영 세션에서 나왔습니다. 다른 환경(조명, 컨테이너, 카메라)에서도 잘 동작할지는 이 데이터로 검증할 수 없습니다.
-- validation이 13장(bbox 12개)으로 작아서, 평가 지표가 크게 흔들릴 수 있습니다.
-- test bbox 54개 중 27개는 장면에 고정된 같은 seal입니다.
+4. 학습합니다. 모델 2개 × seed 3개, 총 6번 실행합니다.
 
-## 다음 단계
+   ```bash
+   python scripts/train.py --model yolo11n --seed 0 --device 0
+   python scripts/train.py --model yolo11s --seed 0 --device 0
+   # seed 1, 2도 같은 방식으로 실행
+   ```
 
-- [ ] YOLO 모델 학습 및 validation 평가
-- [ ] held-out test 평가
+   - 결과는 `outputs/runs/<model>_seed<seed>/`에 저장되고, `outputs/experiments.csv`에 한 줄씩 기록됩니다.
+   - 기록 항목: validation 지표, git commit, split_hash, 원본 ZIP SHA-256, GPU 이름, 라이브러리 버전
+   - `--smoke --device cpu`를 붙이면 동작 확인용으로 1 epoch만 실행합니다. 결과는 `outputs/smoke/`에 따로 저장됩니다.
+
+5. 최종 모델을 validation 기준으로 정한 뒤에만 test를 평가합니다.
+
+   ```bash
+   python scripts/evaluate.py --weights outputs/runs/yolo11n_seed1/weights/best.pt --split test --final --device 0
+   ```
+
+   - `--final` 없이는 test 평가를 거부합니다.
+   - `outputs/test_evaluation.csv`가 이미 있으면 다시 평가하지 않습니다.
+
+## 사용 도구
+
+- [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) 8.4.175 (AGPL-3.0)
+- PyTorch
+- Roboflow (라벨링, export)
