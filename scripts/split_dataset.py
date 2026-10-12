@@ -13,6 +13,7 @@ container_seal 데이터셋을 프레임 번호 기준으로 train / valid / tes
 """
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -194,6 +195,15 @@ def prepare_output(overwrite):
         )
 
 
+def file_sha256(path):
+    """파일 전체의 SHA-256. 원본 ZIP 내용이 같은지 환경과 관계없이 확인하는 데 쓴다."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def write_data_yaml():
     # Ultralytics는 path가 상대경로면 프로젝트가 아닌 자체 datasets 폴더 기준으로 찾기 때문에
     # 절대경로를 기록한다. 다른 PC에서는 이 스크립트를 다시 실행하면 경로가 맞게 갱신된다.
@@ -269,12 +279,16 @@ def main():
             fail(f"{split} 복사 결과에서 이미지/label 대응이 맞지 않습니다.")
 
     # 기록용 표시 파일 (다음 --overwrite 때 이 스크립트가 만든 폴더인지 확인)
+    zip_sha256 = file_sha256(ZIP_PATH)
     info = {
         "source_zip": ZIP_PATH.name,
+        "source_zip_sha256": zip_sha256,
         "splits": {s: sorted(f) for s, f in SPLITS.items()},
         "excluded": {str(f): r for f, r in sorted(EXCLUDED.items())},
     }
-    (tmp_dir / MARKER_FILE).write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8")
+    # write_text는 Windows에서 줄바꿈을 CRLF로 바꾸므로, OS와 관계없이 LF로 저장되도록 바이트로 쓴다
+    text = json.dumps(info, ensure_ascii=False, indent=2) + "\n"
+    (tmp_dir / MARKER_FILE).write_bytes(text.encode("utf-8"))
 
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)  # prepare_output에서 이 스크립트가 만든 폴더임을 확인함
@@ -286,6 +300,7 @@ def main():
     # 결과 출력
     # -----------------------------------------------------------------------
     print(f"입력 ZIP : {ZIP_PATH}")
+    print(f"ZIP SHA-256: {zip_sha256}")
     print(f"출력 폴더: {OUTPUT_DIR}")
     print(f"data.yaml: {DATA_YAML_PATH}\n")
 

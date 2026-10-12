@@ -2,6 +2,7 @@
 
 import csv
 import hashlib
+import json
 import platform
 import subprocess
 from datetime import datetime
@@ -28,11 +29,34 @@ def git_commit():
         return "unknown"
 
 
-def split_hash():
-    """어떤 데이터 분할로 실험했는지 구분하기 위한 .split_info.json 해시 (앞 12자리)."""
+def load_split_info():
+    """split_dataset.py가 남긴 .split_info.json 내용. 없으면 None."""
     if not SPLIT_INFO.exists():
+        return None
+    return json.loads(SPLIT_INFO.read_text(encoding="utf-8"))
+
+
+def split_hash(info):
+    """train/valid/test/excluded 구성을 식별하는 해시 (앞 12자리).
+
+    파일 바이트가 아니라 프레임 번호만으로 계산하므로 OS, 줄바꿈, 들여쓰기,
+    제외 이유 문구와 관계없이 같은 split이면 같은 값이 나온다.
+    """
+    if info is None:
         return "missing"
-    return hashlib.sha256(SPLIT_INFO.read_bytes()).hexdigest()[:12]
+    canonical = {
+        "splits": {name: sorted(int(f) for f in frames) for name, frames in info["splits"].items()},
+        "excluded": sorted(int(f) for f in info["excluded"]),
+    }
+    text = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
+def source_zip_hash(info):
+    """분할에 사용한 원본 ZIP의 SHA-256 (split_dataset.py가 기록한 값)."""
+    if info is None:
+        return "missing"
+    return info.get("source_zip_sha256", "missing")
 
 
 def device_name(device):
@@ -57,10 +81,12 @@ def environment_info(device):
     import torch
     import ultralytics
 
+    info = load_split_info()
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "git_commit": git_commit(),
-        "split_hash": split_hash(),
+        "split_hash": split_hash(info),
+        "source_zip_hash": source_zip_hash(info),
         "device": str(device),
         "device_name": device_name(device),
         "python": platform.python_version(),
