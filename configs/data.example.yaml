@@ -1,0 +1,14 @@
+# 공유용 예시 파일입니다.
+# 실제 학습에 쓰는 configs/data.yaml은 아래 명령이 PC 환경에 맞는 절대경로로 생성합니다.
+#   python scripts/split_dataset.py
+#
+# 직접 작성할 경우 path를 본인 환경의 데이터셋 폴더 절대경로로 바꾸세요.
+# (Ultralytics는 상대경로 path를 프로젝트가 아닌 자체 datasets 폴더 기준으로 해석합니다.)
+path: /absolute/path/to/container-seal-detection/data/processed/container_seal_v2
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 1
+names:
+  0: container_seal
