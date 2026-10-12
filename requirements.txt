@@ -1,0 +1,9 @@
+# 학습/평가 의존성 (Python 3.13.1, Windows 로컬 CPU에서 설치 확인)
+#
+# torch는 환경마다 설치 방법이 달라 여기서 고정하지 않는다. 먼저 torch를 설치한 뒤 이 파일을 설치한다.
+#   - 로컬 CPU   : pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#                  (확인한 버전: torch 2.14.1+cpu, torchvision 0.29.1+cpu)
+#   - Colab GPU  : 기본 설치된 CUDA torch를 그대로 사용
+#
+#   pip install -r requirements.txt
+ultralytics==8.4.175
