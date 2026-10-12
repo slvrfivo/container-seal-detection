@@ -25,7 +25,7 @@
 | 클래스 | 1개 (`container_seal`) |
 | bounding box | 118개 |
 
-데이터(이미지, 라벨, ZIP)는 회사·업무 데이터라 저장소에 포함하지 않습니다. 같은 이유로 이 README에도 원본 이미지나 예측 결과 이미지는 넣지 않았습니다.
+데이터셋 원본(이미지, 라벨, ZIP)은 저장소에 포함하지 않았습니다. README에는 데이터 이미지 대신 학습 곡선 등 결과 그래프만 포함했습니다.
 
 ## 라벨링 과정
 
@@ -53,7 +53,7 @@
 
 연속 촬영 프레임은 이웃한 프레임끼리 거의 같은 장면입니다. random split을 하면 train과 비슷한 이미지가 validation/test에 섞여 성능이 실제보다 높게 나옵니다. 그래서 **프레임 번호 구간 단위**로 나눴습니다.
 
-- **test**: 촬영 구도가 바뀐 원거리 장면(frame 79–106) 전체를 held-out test로 고정했습니다.
+- **test**: 촬영 구도가 바뀐 원거리 장면 전체(frame 79–100, 102–106, 27장)를 held-out test로 고정했습니다. frame 101은 원본에 없습니다.
 - **validation**: 근접 장면(frame 1–76) 안에서 연속된 두 구간을 골랐습니다. 하나는 은색 seal이 나오는 25–30, 다른 하나는 파란 seal과 negative가 함께 있는 44–50입니다.
 - **buffer**: train과 validation이 맞닿는 경계마다 1프레임씩 제외했습니다. 비슷한 프레임이 양쪽에 섞이는 것을 막기 위해서입니다.
 
@@ -61,7 +61,7 @@
 |---|---|---|---|---|
 | train | 1–12, 14–23, 32–42, 52–76 | 58 | 46 | 12 |
 | valid | 25–30, 44–50 | 13 | 12 | 1 |
-| test | 79–106 (101 없음) | 27 | 54 | 0 |
+| test | 79–100, 102–106 | 27 | 54 | 0 |
 | excluded | 13, 24, 31, 43, 51, 77, 78 | 7 | 6 | – |
 
 제외 이유는 다음과 같습니다.
@@ -130,13 +130,16 @@ validation은 13장(bbox 12개)입니다. 평균 ± 표준편차는 3개 seed의
 ### 선택 과정
 
 - **모델**
-  - 주 기준인 validation mAP50-95의 3-seed 평균은 YOLO11n 0.7273, YOLO11s 0.6758이었습니다.
-  - 평균이 더 높고 seed 간 recall 변동도 더 작은 **YOLO11n**을 선택했습니다.
-  - 선택 규칙 3번에 해당하더라도 결론은 같습니다. 그 경우에도 더 작은 YOLO11n을 고르게 되어 있기 때문입니다.
-  - 다만 seed가 3개뿐이고 validation이 12개 box라, 이 차이가 통계적으로 확실하다고 보기는 어렵습니다.
+  - 주 기준인 validation mAP50-95의 3-seed 평균은 YOLO11n 0.7273, YOLO11s 0.6758로 YOLO11n이 더 높았습니다.
+  - 다만 seed가 3개뿐이고 validation도 13장(bbox 12개)으로 작아서, 두 모델의 차이가 확실하다고 보기는 어렵습니다.
+  - 이번 데이터에서는 YOLO11s가 더 낫다고 볼 근거가 없었으므로, 더 가벼운 **YOLO11n**을 선택했습니다. 선택 규칙의 어느 경우를 적용해도 결론은 같습니다.
 - **test용 weight**
   - YOLO11n의 세 seed 중 validation mAP50-95가 가장 높은 **seed 1의 best.pt**(best epoch 94)를 최종 test 평가에 사용했습니다.
   - 이 weight의 validation mAP50-95 **0.7561은 3개 중 가장 높은 단일 run 값이라 낙관적인 수치**입니다. YOLO11n의 validation 성능은 3-seed 평균인 0.7273 ± 0.0426으로 보는 것이 적절합니다.
+
+![YOLO11n seed 1 학습 곡선](assets/results.png)
+
+YOLO11n seed 1의 학습 결과입니다. validation mAP50-95 기준 best epoch은 94이고, 이 epoch의 best.pt를 최종 held-out test에 사용했습니다.
 
 ## Held-out test 결과
 
@@ -147,7 +150,7 @@ validation은 13장(bbox 12개)입니다. 평균 ± 표준편차는 3개 seed의
 | 항목 | 값 |
 |---|---|
 | 모델 | YOLO11n seed 1, best.pt |
-| test 데이터 | 27장, 54개 instance (원거리 장면, frame 79–106) |
+| test 데이터 | 27장, 54개 instance (원거리 장면, frame 79–100, 102–106) |
 | Precision | 0.991 |
 | Recall | 0.500 |
 | mAP50 | 0.540 |
@@ -160,7 +163,7 @@ validation은 13장(bbox 12개)입니다. 평균 ± 표준편차는 3개 seed의
 
 ## Failure analysis
 
-test 예측 결과를 직접 확인한 내용입니다. 예측 이미지는 회사·업무 데이터라 공개하지 않습니다.
+test 예측 결과를 직접 확인한 내용입니다. 예측 이미지는 README에는 넣지 않았고, 대신 관찰한 실패 패턴을 텍스트로 정리했습니다.
 
 **관찰한 내용**
 - test 이미지에는 모두 container_seal이 2개씩 있습니다.
@@ -233,6 +236,8 @@ Failure analysis에서 "작게 보이는 seal을 놓친다"는 패턴을 확인�
 
 ```
 container-seal-detection/
+├── assets/
+│   └── results.png          # YOLO11n seed 1 학습 곡선
 ├── configs/
 │   └── data.example.yaml    # 데이터셋 설정 예시 (실제 data.yaml은 스크립트가 생성)
 ├── data/
@@ -292,6 +297,18 @@ container-seal-detection/
 
    - `--final` 없이는 test 평가를 거부합니다.
    - `outputs/test_evaluation.csv`가 이미 있으면 다시 평가하지 않습니다.
+
+### Google Colab에서 실행
+
+실제 학습은 Google Colab(Tesla T4)에서 했습니다. 순서는 위 2~4단계와 같고, Colab 셀에서는 저장소 폴더로 이동한 뒤 아래처럼 실행합니다. 런타임은 GPU로 설정하고, v2 ZIP은 `data/raw/`에 업로드합니다.
+
+```bash
+!pip install -r requirements.txt
+!python scripts/split_dataset.py
+!for m in yolo11n yolo11s; do for s in 0 1 2; do python scripts/train.py --model $m --seed $s --device 0; done; done
+```
+
+Colab 세션이 끝나면 `outputs/`가 사라지므로, 결과는 따로 백업해야 합니다.
 
 ### Inference
 
