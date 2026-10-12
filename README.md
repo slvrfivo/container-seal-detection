@@ -139,13 +139,13 @@ validation은 13장(bbox 12개)입니다. 평균 ± 표준편차는 3개 seed의
 
 ![YOLO11n seed 1 학습 곡선](assets/results.png)
 
-YOLO11n seed 1의 학습 결과입니다. validation mAP50-95 기준 best epoch은 94이고, 이 epoch의 best.pt를 최종 held-out test에 사용했습니다.
+YOLO11n seed 1의 학습 결과입니다. validation mAP50-95 기준 best epoch는 94이고, 이 epoch의 best.pt를 최종 held-out test에 사용했습니다.
 
 ## Held-out test 결과
 
 이 섹션의 imgsz 640 결과가 이 프로젝트의 **공식 held-out benchmark**입니다.
 
-최종 모델을 validation만으로 정한 뒤, test를 **한 번만** 평가했습니다. test 결과를 보고 모델이나 hyperparameter를 바꾸지 않았고, 같은 test set으로 다른 모델을 다시 고르지도 않았습니다.
+모델과 공식 평가 설정(imgsz 640)은 validation만으로 정했고, imgsz 640으로 평가한 held-out test 결과를 공식 benchmark로 유지했습니다. 이후 test failure를 확인한 뒤 같은 weight로 imgsz 1280을 post-hoc으로 추가 평가했지만, 이 결과는 모델 선택이나 공식 benchmark 갱신에 사용하지 않았습니다.
 
 | 항목 | 값 |
 |---|---|
