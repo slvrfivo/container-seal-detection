@@ -1,43 +1,18 @@
 # Container Seal Detection (YOLO11)
 
-직접 구축한 연속 프레임 데이터셋을 사용해 컨테이너 seal을 검출하는 **1-class object detection** 프로젝트입니다. YOLO11n/s 비교뿐 아니라 연속 프레임 누출 방지, annotation 검증, 새로운 구도에서의 실패 분석에 집중했습니다.
+컨테이너 seal을 검출하기 위해 촬영 이미지 105장을 라벨링하고 YOLO11n, YOLO11s를 학습한 프로젝트입니다. 연속 촬영 프레임이라 데이터 분할 방식을 먼저 정했고, 모델을 고른 뒤에는 별도 원거리 장면에서 테스트했습니다.
 
-**[Notion 포트폴리오 (실험 과정·시각화·회고)](https://app.notion.com/p/3f797ecb382581e9a4c4d0877e21442a)** · [주요 코드](scripts/) · [재현 및 사용 방법](#재현-및-사용-방법)
+[Notion 프로젝트 정리](https://app.notion.com/p/3f797ecb382581e9a4c4d0877e21442a) · [학습 코드](scripts/train.py) · [평가 코드](scripts/evaluate.py) · [추론 코드](scripts/predict.py)
 
-> **상태:** 데이터 구축 및 검수 → 학습 → held-out test 평가 완료  
-> 모든 데이터는 한 번의 연속 촬영에서 얻었고, 결과는 해당 데이터와 평가 조건에 한정됩니다. 원본 이미지·라벨·weight는 공개하지 않습니다.
+## 결과 요약
 
-## 핵심 결과 한눈에 보기
+- **데이터:** 105장, 118개 box, `container_seal` 1 class. Auto Label 결과를 전부 검수하고 누락된 라벨을 수정했습니다.
+- **분할:** 비슷한 연속 프레임이 train/validation/test에 섞이지 않도록 프레임 구간으로 나누고 경계 프레임은 제외했습니다.
+- **학습:** YOLO11n/s를 각각 seed 0, 1, 2로 학습했습니다. validation mAP50-95 평균은 YOLO11n 0.727 ± 0.043, YOLO11s 0.676 ± 0.030이었고, 최종적으로 YOLO11n seed 1을 선택했습니다.
+- **Held-out test (imgsz 640):** mAP50 0.540, mAP50-95 0.289, Recall 0.500. 가까운 seal보다 원거리의 작은 seal을 많이 놓쳤습니다.
+- **추가 확인:** test 결과를 본 뒤 같은 weight로 imgsz 1280 추론을 해봤습니다. 자체 test의 Recall은 좋아졌지만 validation에서는 떨어졌습니다. 이 결과는 공식 benchmark와 분리했습니다.
 
-| 항목 | 결과 |
-|---|---|
-| 데이터 | 105장 · 118 boxes · `container_seal` 1 class |
-| 평가 설계 | 연속 프레임 구간 단위 split + 경계 buffer + 별도 구도 held-out test |
-| 모델 비교 | YOLO11n / YOLO11s × seed 0, 1, 2 |
-| Validation mAP50-95 (3-seed 평균 ± 표본 표준편차) | **YOLO11n 0.727 ± 0.043**, YOLO11s 0.676 ± 0.030 |
-| 최종 선택 | YOLO11n seed 1 (`best.pt`, validation 기준) |
-| 공식 held-out test @640 | **mAP50 0.540 · mAP50-95 0.289 · Recall 0.500** |
-| 주요 실패 패턴 | 별도 원거리 구도에서 작은 seal을 놓치는 false negative |
-| Post-hoc 해상도 검토 | 동일 weight로 1280 추론 시 자체 test Recall은 상승했지만 validation은 하락; 공식 benchmark 아님 |
-
-### 구현 및 검증의 주요 특징
-
-- **라벨 품질:** Roboflow Auto Label 결과 105장 검수, 누락 annotation 수정, 이미지–라벨 대응과 좌표·class 검증
-- **누출 방지:** 연속 프레임 random split을 피하고, 구간 단위 분할·buffer·held-out test 적용
-- **재현성:** Git commit, 데이터 및 split hash, 실행 환경과 seed별 성능 기록
-- **평가 원칙:** validation으로 모델을 정하고 test를 최종 평가에만 사용; 사후 실험 결과는 분리해서 해석
-
-### 코드 구성
-
-| 스크립트 | 역할 |
-|---|---|
-| [`split_dataset.py`](scripts/split_dataset.py) | 분할과 annotation 품질 검증 |
-| [`train.py`](scripts/train.py) | YOLO11n/s seed별 학습 및 성능 기록 |
-| [`evaluate.py`](scripts/evaluate.py) | val/test 분리, test 평가 안전장치 |
-| [`predict.py`](scripts/predict.py) | 이미지/폴더 입력 추론 |
-| [`common.py`](scripts/common.py) | 실행 환경·데이터·코드 버전 추적 |
-
-아래에는 데이터 구축, 분할 근거, 학습 설정, 실험 결과 및 실행 방법을 상세히 기록했습니다.
+데이터가 한 번의 연속 촬영에서 나온 만큼 다른 장면에서도 같은 성능이 나올지는 알 수 없습니다. 이미지·라벨 원본과 모델 weight는 저장소에 올리지 않았습니다.
 
 ## 데이터셋
 
@@ -236,16 +211,16 @@ Failure analysis에서 "작게 보이는 seal을 놓친다"는 패턴을 확인�
 - 이 실험은 저장소 스크립트만으로는 재현되지 않습니다. [scripts/evaluate.py](scripts/evaluate.py)는 imgsz 640으로 고정되어 있고, test 평가를 한 번만 허용하기 때문입니다.
 
 
-## 별도 장면 평가에서 얻은 추가 관찰
+## 추가 테스트에서 확인한 점
 
-학습에 사용하지 않은 추가 장면에 대한 평가 피드백을 통해, 자체 held-out test에서 드러나지 않았던 일반화 문제를 더 살펴봤습니다. 외부 평가 자료의 원본 이미지나 다른 참가자의 개별 결과 및 세부 수치는 이 공개 저장소에 포함하지 않습니다.
+자체 test 이후 별도 장면에서 받은 평가 피드백도 확인했습니다. 공개 README에는 원본 평가 자료나 다른 참가자 모델의 수치를 넣지 않고, 제 모델에서 보인 문제만 간단히 정리했습니다.
 
-- **원거리 객체:** 자체 test에서 보였던 작은 seal의 검출 누락이 다른 장면에서도 관찰됐습니다.
-- **미경험 외형과 구도:** 학습 이미지에 충분히 없던 색상·근접 자세에서는 추가적인 미검출 사례가 있었습니다.
-- **배경 다양성:** 새로운 배경의 구조물이나 그림자에 오탐이 나타나 hard negative 이미지 확보가 필요하다고 판단했습니다.
-- **해상도 효과의 비일관성:** 자체 test의 1280 추론 개선을 다른 장면으로 일반화할 수 없었습니다. 입력 해상도를 올리는 것만으로 해결됐다고 판단하지 않습니다.
+- 원거리의 작은 seal을 놓치는 문제는 다른 장면에서도 나타났습니다.
+- 색상이나 촬영 자세가 달라지면 가까운 seal도 놓치는 경우가 있었습니다.
+- 배경 구조물이나 그림자를 seal로 잘못 검출하는 사례가 있었습니다.
+- 자체 test에서 좋아졌던 1280 추론 결과가 다른 장면에서는 그대로 재현되지 않았습니다.
 
-이는 기존 **공식 held-out benchmark(@640)를 변경하지 않는 후속 관찰**입니다. 다음 모델을 평가할 때는 새로운 촬영 세션을 별도 test로 구성할 계획입니다.
+위 내용은 후속 평가에서 확인한 사항이며, 공식 held-out test 수치(imgsz 640)는 변경하지 않았습니다.
 
 ## 한계
 
