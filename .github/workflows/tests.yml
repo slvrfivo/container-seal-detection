@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  split-tests:
+    # 분할·라벨 검증은 표준 라이브러리만 쓰므로 ultralytics·torch 없이 돌린다.
+    # 로컬(Windows)과 Colab(Linux)에서 모두 쓰는 코드라 두 OS에서 확인한다.
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
