@@ -194,7 +194,7 @@ test 이미지에는 모두 seal이 2개씩 있습니다. 가까이 있거나 �
 
 ## 추가 평가에서 확인한 것
 
-이후 학습에 쓰지 않은 다른 장면들로 평가를 한 번 더 받았습니다. 평가 자료와 다른 참가자 결과는 공개할 수 없어서, 수치 없이 확인한 내용만 적습니다.
+이 작업은 Physical AI 산학 현장 프로젝트의 과제였고, 같은 과제를 받은 참가자들이 낸 모델 6개를 학습에 쓰지 않은 공통 테스트 세트(다른 촬영 세션과 새로 찍은 실데이터)로 함께 평가받았습니다 (2026-10-21 기준). 평가 자료와 다른 참가자 결과는 공개할 수 없어서, 수치 없이 확인한 내용만 적습니다.
 
 - 자체 test에서 봤던 것처럼, 원거리의 작은 seal을 놓치는 경우가 다른 장면에서도 나왔습니다.
 - 학습 데이터에 거의 없던 색의 seal이나 가까이 들고 있는 seal도 놓친 경우가 많았습니다.
@@ -229,6 +229,7 @@ container-seal-detection/
 │   ├── raw/                 # Roboflow export ZIP (Git 제외)
 │   └── processed/           # 분할된 데이터셋 (Git 제외)
 ├── outputs/                 # 학습·평가 결과 (Git 제외)
+├── LICENSE                  # AGPL-3.0
 ├── requirements.txt         # ultralytics 버전 고정 (torch는 환경별 설치)
 └── scripts/
     ├── split_dataset.py     # 프레임 기준 분할 + 검증
@@ -332,3 +333,7 @@ python scripts/predict.py \
 - [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) 8.4.175 (AGPL-3.0)
 - PyTorch
 - Roboflow (라벨링, export)
+
+## 라이선스
+
+이 저장소의 코드는 [GNU AGPL-3.0](LICENSE)을 따릅니다. 학습·추론에 쓰는 Ultralytics YOLO가 AGPL-3.0이라 같은 라이선스로 맞췄습니다. 데이터셋, 모델 weight, 학습 결과는 저장소에 포함하지 않습니다.
