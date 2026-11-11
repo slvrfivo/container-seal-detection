@@ -6,7 +6,7 @@
 
 실험 과정과 그래프는 [Notion 페이지](https://app.notion.com/p/3f797ecb382581e9a4c4d0877e21442a)에 더 자세히 정리했고, 실행 방법은 [아래](#재현-및-사용-방법)에 있습니다.
 
-> 데이터는 모두 한 번의 촬영에서 나왔기 때문에, 아래 결과도 이 데이터 안에서의 결과입니다. 원본 이미지, 라벨, weight는 올리지 않았고, 설명용으로 validation 검출 예시, test 실패 사례, frame 28 라벨 수정 그림 세 장만 넣었습니다.
+> 데이터는 모두 한 번의 촬영에서 나왔기 때문에, 아래 결과도 이 데이터 안에서의 결과입니다. 원본 이미지, 라벨, weight는 올리지 않았고, README에는 검출·라벨링 사례 이미지 네 장과 학습·분할 그래프 두 개만 넣었습니다.
 
 ## 결과 요약
 
@@ -251,6 +251,7 @@ container-seal-detection/
 ├── assets/
 │   ├── results.png          # YOLO11n seed 1 학습 곡선
 │   ├── split_timeline.svg   # 프레임 분할 그림 (plot_split.py가 생성)
+│   ├── near_far_detection.svg  # 근접 validation과 원거리 test 검출 비교
 │   ├── test_frame79_640_vs_1280.jpg  # test frame 79의 정답 / 640 / 1280 비교 (확대)
 │   ├── validation_detection_examples.jpg  # validation 근접 장면 검출 예시 (frame 27, 46, 48)
 │   └── frame28_label_fix.jpg  # frame 28 라벨 v1(빠짐) / v2(추가) 비교
