@@ -1,5 +1,7 @@
 # Container Seal Detection (YOLO11)
 
+[![tests](https://github.com/slvrfivo/container-seal-detection/actions/workflows/tests.yml/badge.svg)](https://github.com/slvrfivo/container-seal-detection/actions/workflows/tests.yml)
+
 직접 찍은 영상에서 뽑은 프레임으로 컨테이너 seal 검출 모델(YOLO11)을 학습하고 평가한 프로젝트입니다. 모델 성능 자체보다는 연속 프레임이 train과 test에 섞이지 않게 나누는 것, 라벨을 꼼꼼히 확인하는 것, 새 구도에서 어디서 틀리는지 보는 데 시간을 많이 썼습니다.
 
 실험 과정과 그래프는 [Notion 페이지](https://app.notion.com/p/3f797ecb382581e9a4c4d0877e21442a)에 더 자세히 정리했고, 실행 방법은 [아래](#재현-및-사용-방법)에 있습니다.
@@ -10,7 +12,7 @@
 
 | 항목 | 결과 |
 |---|---|
-| 데이터 | 105장, box 118개, 클래스 1개 (`container_seal`) |
+| 데이터 | 원본 105장(box 118개) 중 라벨 기준이 애매한 프레임과 분할 경계 buffer 7장을 빼고 98장(box 112개)을 train·validation·test에 사용. 클래스 1개 (`container_seal`) |
 | 분할 | 프레임 구간 단위로 나누고 경계에 buffer를 둠. 구도가 다른 장면은 test로 따로 둠 |
 | 모델 비교 | YOLO11n, YOLO11s를 seed 0, 1, 2로 각각 학습 |
 | validation mAP50-95 (3-seed 평균 ± 표준편차) | YOLO11n 0.727 ± 0.043, YOLO11s 0.676 ± 0.030 |
@@ -35,6 +37,9 @@
 | [`evaluate.py`](scripts/evaluate.py) | val/test 평가 (test는 한 번만 허용) |
 | [`predict.py`](scripts/predict.py) | 새 이미지나 폴더에 추론 |
 | [`common.py`](scripts/common.py) | 실행 환경, 데이터 hash 기록 |
+| [`plot_split.py`](scripts/plot_split.py) | 분할 정의로 프레임 분할 그림(SVG) 생성 |
+
+분할과 라벨 검증 로직은 [tests/](tests/test_split_dataset.py)에서 가짜 ZIP으로 테스트하고, push와 pull request마다 GitHub Actions(Ubuntu, Windows)에서 돌립니다. 테스트 내용은 [아래](#테스트)에 있습니다.
 
 ## 데이터셋
 
@@ -69,6 +74,10 @@ v1과 비교하면 라벨이 바뀐 건 frame 28 하나이고, 이미지는 같�
 - test: 카메라 구도가 바뀐 뒤의 원거리 장면(frame 79–100, 102–106, 27장)을 통째로 test로 떼어 뒀습니다.
 - validation: 근접 장면(frame 1–76) 안에서 연속된 두 구간을 골랐습니다. 은색 seal이 나오는 25–30과, 파란 seal과 negative가 같이 있는 44–50입니다.
 - buffer: train과 validation이 맞닿는 경계에서 1프레임씩 뺐습니다. 거의 같은 프레임이 양쪽에 들어가지 않게 하려는 것입니다.
+
+![프레임 번호별 train / validation / test / 제외 구간](assets/split_timeline.svg)
+
+위 그림은 [scripts/plot_split.py](scripts/plot_split.py)가 `split_dataset.py`의 분할 정의를 그대로 읽어 그립니다. 분할을 바꾸면 그림도 다시 만들어야 하고, 그림이 코드와 다르면 테스트가 실패합니다.
 
 | split | frame | 이미지 | bbox | empty label |
 |---|---|---|---|---|
@@ -221,8 +230,11 @@ test 이미지에는 모두 seal이 2개씩 있습니다. 가까이 있거나 �
 
 ```
 container-seal-detection/
+├── .github/workflows/
+│   └── tests.yml            # push·PR마다 단위 테스트 실행 (Ubuntu, Windows)
 ├── assets/
-│   └── results.png          # YOLO11n seed 1 학습 곡선
+│   ├── results.png          # YOLO11n seed 1 학습 곡선
+│   └── split_timeline.svg   # 프레임 분할 그림 (plot_split.py가 생성)
 ├── configs/
 │   └── data.example.yaml    # 데이터셋 설정 예시 (실제 data.yaml은 스크립트가 생성)
 ├── data/
@@ -231,13 +243,35 @@ container-seal-detection/
 ├── outputs/                 # 학습·평가 결과 (Git 제외)
 ├── LICENSE                  # AGPL-3.0
 ├── requirements.txt         # ultralytics 버전 고정 (torch는 환경별 설치)
-└── scripts/
-    ├── split_dataset.py     # 프레임 기준 분할 + 검증
-    ├── train.py             # 학습 1회 + validation 재평가 + 실험 기록
-    ├── evaluate.py          # val/test 평가 (test는 --final 필요, 한 번만 허용)
-    ├── predict.py           # 새 이미지 또는 이미지 폴더에 대한 inference
-    └── common.py            # 경로, 실행 환경·데이터 hash 기록
+├── scripts/
+│   ├── split_dataset.py     # 프레임 기준 분할 + 검증
+│   ├── train.py             # 학습 1회 + validation 재평가 + 실험 기록
+│   ├── evaluate.py          # val/test 평가 (test는 --final 필요, 한 번만 허용)
+│   ├── predict.py           # 새 이미지 또는 이미지 폴더에 대한 inference
+│   ├── common.py            # 경로, 실행 환경·데이터 hash 기록
+│   └── plot_split.py        # 분할 정의 → assets/split_timeline.svg
+└── tests/
+    └── test_split_dataset.py  # 분할·라벨 검증 단위 테스트 (가짜 ZIP 사용)
 ```
+
+## 테스트
+
+[tests/test_split_dataset.py](tests/test_split_dataset.py)는 실제 이미지 없이, Roboflow export와 같은 파일명 규칙을 가진 작은 가짜 ZIP으로 분할 스크립트를 확인합니다. Python 표준 라이브러리만 쓰므로 ultralytics나 torch 없이 실행됩니다.
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+| 확인하는 것 | 내용 |
+|---|---|
+| 분할 정의 | 모든 프레임이 정확히 한 그룹에 속함, split별 장 수가 README와 같음, test 구간이 train·validation보다 뒤에 있음, validation 바로 앞뒤 프레임이 train에 없음 |
+| split_hash | 지금 분할의 hash가 학습 기록의 `6f8a98888a3b`와 같음, 순서나 제외 이유 문구가 달라도 hash가 같음 |
+| 라벨 형식 | 값 개수, 클래스 번호, NaN, 폭·높이 범위, 이미지 밖으로 나가는 box를 거부함. 빈 라벨은 negative로 받음 |
+| ZIP 구성 | 라벨 없는 이미지, 이미지 없는 라벨, 같은 프레임 중복, 예상과 다른 파일명을 거부함 |
+| 전체 실행 | split별 이미지·라벨이 1:1로 복사되고 제외 프레임은 빠짐, 기록 파일·`data.yaml` 생성, 검증 실패 시 아무 파일도 만들지 않음, `--overwrite` 없이는 덮어쓰지 않음, 이 스크립트가 만들지 않은 폴더는 `--overwrite`여도 지우지 않음 |
+| 분할 그림 | `assets/split_timeline.svg`가 현재 분할 정의로 다시 그린 결과와 같음 |
+
+학습·평가 스크립트(`train.py`, `evaluate.py`, `predict.py`)는 ultralytics와 실제 데이터가 필요해서 자동 테스트에 넣지 않았습니다. 학습 코드는 `train.py --smoke --device cpu`로 1 epoch 동작 확인을 할 수 있습니다.
 
 ## 재현 및 사용 방법
 
