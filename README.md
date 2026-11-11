@@ -23,7 +23,7 @@
 
 ![validation 근접 장면 검출 예시: 은색 seal, 파란 seal, seal 없는 장면](assets/validation_detection_clean.svg)
 
-위 그림과 아래의 frame 79 비교 그림은 원본 JPG의 잘린 클래스명 표시만 짧게 덮어쓴 SVG입니다. 검출 박스·결과는 수정하지 않았고, 원본 JPG도 `assets/`에 그대로 남겨 두었습니다.
+위 그림과 아래의 frame 79 비교 그림은 원본 JPG에서 큰 클래스명 표시를 제외한 부분을 확대해 재배치한 SVG입니다. 원본 검출 결과나 박스를 새로 그리지 않았으며, 원본 JPG도 `assets/`에 그대로 남겨 두었습니다. 일부 박스 테두리는 확대 크롭에 의해 잘릴 수 있습니다.
 
 최종 모델(YOLO11n seed 1, imgsz 640)이 validation 근접 장면에서 검출한 예시입니다. 모델 선택에 쓴 데이터라 held-out 결과는 아닙니다. 은색 seal과 파란 seal을 모두 신뢰도 0.9로 찾았고, seal이 없는 frame 48에서는 아무것도 잡지 않았습니다. validation box 12개 중 놓친 1개는 frame 28로, 손에 거의 가려져 화면 끝에 조금 보이는 seal입니다. v1에서 라벨이 빠져 있다가 v2에서 직접 추가한 바로 그 box입니다([라벨링 과정](#라벨링-과정)).
 
@@ -251,8 +251,8 @@ container-seal-detection/
 ├── .github/workflows/
 │   └── tests.yml            # push·PR마다 단위 테스트 실행 (Ubuntu, Windows)
 ├── assets/
-│   ├── validation_detection_clean.svg  # validation 예측 이미지 가독성 보정(잘린 클래스명 표시)
-│   ├── test_frame79_640_vs_1280_clean.svg  # test 640/1280 비교 가독성 보정
+│   ├── validation_detection_clean.svg  # validation 검출 사진의 확대 크롭 레이아웃
+│   ├── test_frame79_640_vs_1280_clean.svg  # test 640/1280 비교용 확대 크롭 레이아웃
 │   ├── results.png          # YOLO11n seed 1 학습 곡선
 │   ├── split_timeline.svg   # 프레임 분할 그림 (plot_split.py가 생성)
 │   ├── near_far_detection.svg  # 근접 validation과 원거리 test 검출 비교
