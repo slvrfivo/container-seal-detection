@@ -6,7 +6,7 @@
 
 실험 과정과 그래프는 [Notion 페이지](https://app.notion.com/p/3f797ecb382581e9a4c4d0877e21442a)에 더 자세히 정리했고, 실행 방법은 [아래](#재현-및-사용-방법)에 있습니다.
 
-> 데이터는 모두 한 번의 촬영에서 나왔기 때문에, 아래 결과도 이 데이터 안에서의 결과입니다. 원본 이미지, 라벨, weight는 올리지 않았고, 예측 이미지는 틀린 경우를 보여 주는 확대 그림 한 장만 넣었습니다.
+> 데이터는 모두 한 번의 촬영에서 나왔기 때문에, 아래 결과도 이 데이터 안에서의 결과입니다. 원본 이미지, 라벨, weight는 올리지 않았고, 설명용으로 validation 검출 예시, test 실패 사례, frame 28 라벨 수정 그림 세 장만 넣었습니다.
 
 ## 결과 요약
 
@@ -20,6 +20,10 @@
 | held-out test (imgsz 640) | mAP50 0.540, mAP50-95 0.289, recall 0.500 |
 | 주로 틀린 경우 | 원거리 장면에서 작게 보이는 seal을 놓침 |
 | 1280 추론 (사후 확인) | 같은 weight로 test recall은 올랐지만 validation은 떨어짐. 공식 결과로 쓰지 않음 |
+
+![validation 근접 장면 검출 예시: 은색 seal, 파란 seal, seal 없는 장면](assets/validation_detection_examples.jpg)
+
+최종 모델(YOLO11n seed 1, imgsz 640)이 validation 근접 장면에서 검출한 예시입니다. 모델 선택에 쓴 데이터라 held-out 결과는 아닙니다. 은색 seal과 파란 seal을 모두 신뢰도 0.9로 찾았고, seal이 없는 frame 48에서는 아무것도 잡지 않았습니다. validation box 12개 중 놓친 1개는 frame 28로, 손에 거의 가려져 화면 끝에 조금 보이는 seal입니다. v1에서 라벨이 빠져 있다가 v2에서 직접 추가한 바로 그 box입니다([라벨링 과정](#라벨링-과정)).
 
 ## 신경 쓴 부분
 
@@ -64,6 +68,10 @@ v2에서는 이렇게 처리했습니다.
 - frame 28: 빠진 box를 추가했습니다.
 - frame 13: seal이 손에 거의 가려져서 box를 어디까지 그려야 할지 애매했습니다. 억지로 라벨을 붙이지 않고 데이터셋에서 뺐습니다.
 - frame 48: 다시 보니 정상 negative라 그대로 뒀습니다.
+
+![frame 28: v1에서 빠진 라벨과 v2에서 추가한 box](assets/frame28_label_fix.jpg)
+
+frame 28은 seal 끝이 손가락 사이로 화면 오른쪽 끝에 조금만 보여서 놓치기 쉬운 경우였습니다. 그림의 v2 box는 라벨 파일 좌표가 아니라 Ultralytics validation 정답 그림(1/4 크기)에서 옮겨 그린 것이라, 위치에 20 px 정도 오차가 있을 수 있습니다. 최종 모델도 validation에서 이 box 하나만 놓쳤습니다([결과 요약](#결과-요약)).
 
 v1과 비교하면 라벨이 바뀐 건 frame 28 하나이고, 이미지는 같습니다.
 
@@ -239,7 +247,9 @@ container-seal-detection/
 ├── assets/
 │   ├── results.png          # YOLO11n seed 1 학습 곡선
 │   ├── split_timeline.svg   # 프레임 분할 그림 (plot_split.py가 생성)
-│   └── test_frame79_640_vs_1280.jpg  # test frame 79의 정답 / 640 / 1280 비교 (확대)
+│   ├── test_frame79_640_vs_1280.jpg  # test frame 79의 정답 / 640 / 1280 비교 (확대)
+│   ├── validation_detection_examples.jpg  # validation 근접 장면 검출 예시 (frame 27, 46, 48)
+│   └── frame28_label_fix.jpg  # frame 28 라벨 v1(빠짐) / v2(추가) 비교
 ├── configs/
 │   └── data.example.yaml    # 데이터셋 설정 예시 (실제 data.yaml은 스크립트가 생성)
 ├── data/
