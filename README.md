@@ -21,7 +21,9 @@
 | 주로 틀린 경우 | 원거리 장면에서 작게 보이는 seal을 놓침 |
 | 1280 추론 (사후 확인) | 같은 weight로 test recall은 올랐지만 validation은 떨어짐. 공식 결과로 쓰지 않음 |
 
-![validation 근접 장면 검출 예시: 은색 seal, 파란 seal, seal 없는 장면](assets/validation_detection_examples.jpg)
+![validation 근접 장면 검출 예시: 은색 seal, 파란 seal, seal 없는 장면](assets/validation_detection_clean.svg)
+
+위 그림과 아래의 frame 79 비교 그림은 원본 JPG의 잘린 클래스명 표시만 짧게 덮어쓴 SVG입니다. 검출 박스·결과는 수정하지 않았고, 원본 JPG도 `assets/`에 그대로 남겨 두었습니다.
 
 최종 모델(YOLO11n seed 1, imgsz 640)이 validation 근접 장면에서 검출한 예시입니다. 모델 선택에 쓴 데이터라 held-out 결과는 아닙니다. 은색 seal과 파란 seal을 모두 신뢰도 0.9로 찾았고, seal이 없는 frame 48에서는 아무것도 잡지 않았습니다. validation box 12개 중 놓친 1개는 frame 28로, 손에 거의 가려져 화면 끝에 조금 보이는 seal입니다. v1에서 라벨이 빠져 있다가 v2에서 직접 추가한 바로 그 box입니다([라벨링 과정](#라벨링-과정)).
 
@@ -188,7 +190,7 @@ test 이미지에는 모두 seal이 2개씩 있습니다. 가까이 있거나 �
 
 같은 최종 모델의 근접 validation(frame 27)과 원거리 test(frame 79) 검출 예시입니다. 근접 장면에서는 손에 든 seal을 검출했지만, 원거리 장면에서는 손에 든 seal만 찾고 구조물에 고정된 작은 seal은 놓쳤습니다. 두 화면은 서로 다른 부분을 잘라 보여주므로 seal의 절대적인 크기를 직접 비교하는 그림은 아닙니다.
 
-![test frame 79: 정답, imgsz 640 추론, imgsz 1280 추론 비교](assets/test_frame79_640_vs_1280.jpg)
+![test frame 79: 정답, imgsz 640 추론, imgsz 1280 추론 비교](assets/test_frame79_640_vs_1280_clean.svg)
 
 test frame 79의 한 부분을 확대한 그림입니다. 박스는 Ultralytics 평가 결과 그대로이고, 원과 글씨만 따로 그려 넣었습니다. 640 추론(가운데)은 손에 든 seal은 찾았지만 거치대 위의 작은 seal은 놓쳤습니다. 이 seal은 640 입력에서 약 12×25 px 크기입니다. 같은 test 배치의 8장(frame 79–86)을 보면 손에 든 seal은 8장 모두 찾았고 거치대 위 seal은 8장 모두 놓쳤습니다. 오른쪽 1280 결과는 [아래 사후 확인](#추론-해상도를-올려-본-실험-사후-확인)에서 다룹니다.
 
@@ -249,6 +251,8 @@ container-seal-detection/
 ├── .github/workflows/
 │   └── tests.yml            # push·PR마다 단위 테스트 실행 (Ubuntu, Windows)
 ├── assets/
+│   ├── validation_detection_clean.svg  # validation 예측 이미지 가독성 보정(잘린 클래스명 표시)
+│   ├── test_frame79_640_vs_1280_clean.svg  # test 640/1280 비교 가독성 보정
 │   ├── results.png          # YOLO11n seed 1 학습 곡선
 │   ├── split_timeline.svg   # 프레임 분할 그림 (plot_split.py가 생성)
 │   ├── near_far_detection.svg  # 근접 validation과 원거리 test 검출 비교
